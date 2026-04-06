@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>我的 AR 卡圖鑑 Pro - 繁中官方版</title>
+    <title>我的 AR 卡圖鑑 Pro - 雲端閃卡版</title>
     <style>
         :root { --primary-color: #e3350d; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-color: #333; }
         body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 10px; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding-bottom: 80px; }
@@ -15,25 +15,52 @@
         .controls { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; }
         .search-input { padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s; }
         .search-input:focus { border-color: var(--primary-color); }
-        .filter-select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; background: white; font-size: 14px; }
+        .filter-select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; background: white; font-size: 14px; font-weight: bold; }
+        
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
-        .card-item { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; position: relative; transition: 0.2s; border: 2px solid transparent; }
+        
+        /* 閃卡效果主體 */
+        .card-item { 
+            background: var(--card-bg); border-radius: 12px; overflow: hidden; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; position: relative; 
+            transition: 0.3s; border: 2px solid transparent; perspective: 1000px;
+        }
+
+        /* 閃光層 (Holo Overlay) */
+        .card-item::after {
+            content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(255,255,255,0) 30%, rgba(255,255,255,0.3) 50%, rgba(255,255,255,0) 70%);
+            background-size: 200% 200%; opacity: 0; transition: 0.5s; pointer-events: none; z-index: 5;
+        }
+        
+        /* 懸停或選中時的彩虹閃爍 */
+        .card-item:hover::after { opacity: 1; background-position: 100% 100%; }
         .card-item:active { transform: scale(0.92); }
+
         .card-image { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #eee; display: block; transition: 0.3s; }
         .card-info { padding: 8px; text-align: center; }
         .card-id { font-size: 10px; color: #888; display: block; }
         .card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
-        .card-item.collected .card-image { opacity: 0.35; filter: grayscale(80%); }
-        .card-item.collected { border-color: #28a745; }
+        
+        /* 已收藏狀態 */
+        .card-item.collected .card-image { opacity: 0.4; filter: grayscale(50%); }
+        .card-item.collected { border-color: #28a745; box-shadow: 0 0 15px rgba(40, 167, 69, 0.2); }
+        .card-item.collected::before {
+            content: "✨"; position: absolute; top: 5px; right: 5px; z-index: 10; font-size: 16px;
+        }
+
         .check-mark { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: #28a745; opacity: 0; transition: 0.2s; pointer-events: none; z-index: 2; text-shadow: 0 0 10px white; }
         .card-item.collected .check-mark { opacity: 1; }
+        
         .footer-tools { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 10px; display: flex; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 500; }
         .tool-btn { border: none; background: #f8f9fa; padding: 8px 15px; border-radius: 8px; font-size: 12px; cursor: pointer; color: #555; display: flex; flex-direction: column; align-items: center; gap: 4px; }
         .no-results { grid-column: 1/-1; text-align: center; padding: 40px; color: #999; }
+        
         .back-to-top { position: fixed; bottom: 85px; right: 20px; width: 45px; height: 45px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; z-index: 99; opacity: 0; transition: 0.3s; pointer-events: none; font-size: 20px; }
         .back-to-top.show { opacity: 1; pointer-events: auto; }
+        
         #previewModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
-        #previewModal img { max-width: 90%; max-height: 80%; border-radius: 15px; box-shadow: 0 0 40px rgba(0,0,0,0.5); transform: scale(0.8); transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        #previewModal img { max-width: 90%; max-height: 80%; border-radius: 15px; box-shadow: 0 0 40px rgba(255,255,255,0.3); transform: scale(0.8); transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
         #previewModal.active img { transform: scale(1); }
     </style>
 </head>
@@ -42,38 +69,50 @@
     <div class="header"><h1>✨ 繁中版 AR/CHR 收藏圖鑑</h1></div>
 
     <div class="sticky-nav">
-        <div class="progress-bar-container"><div id="progressText" class="progress-text">讀取中...</div></div>
+        <div class="progress-bar-container"><div id="progressText" class="progress-text">讀取資料中...</div></div>
     </div>
 
     <div class="controls">
-        <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜尋名稱或編號 (如: SV11WF)">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜尋名稱或編號">
         <select id="filterSelect" class="filter-select">
             <option value="all">🌟 全部繁中卡片</option>
-            <option disabled>────── M 系列 (超級進化) ──────</option>
             <option value="M4">🥷 忍者飛旋 (M4)</option>
             <option value="M3">🌌 虛無歸零 (M3)</option>
             <option value="M2a">🧬 超級進化夢想ex (M2a)</option>
             <option value="M2-">🔥 烈獄狂火X (M2)</option>
             <option value="M1LF">🔴 超級勇氣 (M1LF)</option>
             <option value="M1SF">🔵 超級交響樂 (M1SF)</option>
-            <option disabled>────── SV 系列 (朱&紫) ──────</option>
-            <option value="SV11">⚪⚫ 超級電磁砲系列</option>
-            <option value="SV10">🚀 火箭隊的榮耀</option>
-            <option value="SV9">🤝 對戰搭檔系列</option>
-            <option value="SV8">⚡ 樂園滿月/超電突圍</option>
-            <option value="SV2a">🎈 寶可夢 151</option>
-            <option value="s12a">⚔️🛡️ 天地萬物</option>
+            <option value="SV11WF">⚪ 純白閃焰 (SV11WF)</option>
+            <option value="SV11BF">⚫ 漆黑伏特 (SV11BF)</option>
+            <option value="SV10">🚀 火箭隊的榮耀 (SV10)</option>
+            <option value="SV9a">🔥 熱風競技場 (SV9a)</option>
+            <option value="SV9">🤝 對戰搭檔 (SV9)</option>
+            <option value="SV8">⚡ 超電突圍 (SV8)</option>
+            <option value="SV8a">🌕 樂園滿月 (SV8a)</option>
+            <option value="SV7">💎 星晶奇跡 (SV7)</option>
+            <option value="SV6a">🌙 黑夜漫遊者 (SV6a)</option>
+            <option value="SV6">👺 變幻假面 (SV6)</option>
+            <option value="SV5K">🦖 狂野之力 (SV5K)</option>
+            <option value="SV5M">🤖 異度審判 (SV5M)</option>
+            <option value="SV4a">✨ 閃色寶藏 ex (SV4a)</option>
+            <option value="SV4M">🤖 未來閃光 (SV4M)</option>
+            <option value="SV4Kb">🦖 古代咆哮 (SV4Kb)</option>
+            <option value="SV4Ka">🌊 激狂浪潮 (SV4Ka)</option>
+            <option value="SV3">🔥 黑炎的支配者 (SV3)</option>
+            <option value="SV2a">🎈 寶可夢 151 (SV2a)</option>
+            <option value="SV2Pa">❄️ 雪崩攀登 (SV2Pa)</option>
+            <option value="SV2Da">💥 三重效應 (SV2Da)</option>
+            <option value="s12a">⚔️🛡️ 天地萬物 (s12a)</option>
+            <option value="SV1a">🔴🟣 朱/紫起始包 (SV1a)</option>
+            <option value="SV1Sa">🔴 朱 ex (SV1Sa)</option>
+            <option value="SV1Va">🟣 紫 ex (SV1Va)</option>
         </select>
     </div>
 
     <div class="card-grid" id="cardContainer"></div>
 
     <div id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0, behavior:'smooth'})">🚀</div>
-
-    <div id="previewModal" onclick="closePreview()">
-        <img id="previewImg" src="">
-        <p style="color: white; position: absolute; bottom: 20px;">點擊任意處關閉</p>
-    </div>
+    <div id="previewModal" onclick="closePreview()"><img id="previewImg" src=""><p style="color: white; position: absolute; bottom: 20px;">點擊任意處關閉</p></div>
 
     <div class="footer-tools">
         <button class="tool-btn" onclick="showRawData()"><span>📋</span><span>文字備份</span></button>
@@ -661,7 +700,7 @@ const arCards = [
             { id: 's12a-208', name: '土狼犬 (連畫08)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007528.png' },
             { id: 's12a-209', name: '咩利羊 (連畫09)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007529.png' },
 // ==========================================
-        //   🥷 擴充包：忍者飛旋 (M4) AR 系列
+        //   🥷 擴充包：忍者飛旋 (M4) AR 系列 (更新高清圖源)
         // ==========================================
         { id: 'M4-084', name: '哈力栗', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63667971a24000107f82f/800x.webp' },
         { id: 'M4-085', name: '火狐狸', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636675eb81d0001359780/800x.webp' },
@@ -692,7 +731,6 @@ const arCards = [
         { id: 'M2-092', name: '雙尾怪手', img: 'https://s1.52poke.com/wiki/thumb/9/94/M2-092.jpg/429px-M2-092.jpg' },
     ];
 
-
     const container = document.getElementById('cardContainer');
     const progressText = document.getElementById('progressText');
     const searchInput = document.getElementById('searchInput');
@@ -717,12 +755,8 @@ const arCards = [
             const matchSearch = card.name.toLowerCase().includes(currentSearch) || card.id.toLowerCase().includes(currentSearch);
             let matchFilter = true;
             if (currentFilter !== 'all') {
-                // 特殊邏輯：M2- 必須精確匹配 M2- 開頭，排除 M2a
-                if (currentFilter === 'M2-') {
-                    matchFilter = card.id.startsWith('M2-');
-                } else {
-                    matchFilter = card.id.startsWith(currentFilter);
-                }
+                if (currentFilter === 'M2-') { matchFilter = card.id.startsWith('M2-'); }
+                else { matchFilter = card.id.startsWith(currentFilter); }
             }
             return matchSearch && matchFilter;
         });
@@ -747,7 +781,34 @@ const arCards = [
                 container.appendChild(div);
             });
         }
-        updateProgress(filtered);
+        updateGlobalProgress();
+        updateFilterListProgress();
+    }
+
+    // 1. 更新全局進度條
+    function updateGlobalProgress() {
+        const total = arCards.length;
+        const count = arCards.filter(c => savedData[c.id]).length;
+        const percentage = total === 0 ? 0 : Math.round((count / total) * 100);
+        progressText.textContent = `🏆 全系列總進度：${count} / ${total} (${percentage}%)`;
+    }
+
+    // 2. 修改選單文字，顯示每一彈進度 (智慧型功能)
+    function updateFilterListProgress() {
+        Array.from(filterSelect.options).forEach(option => {
+            if (option.value === "all" || option.disabled) return;
+            const prefix = option.value;
+            const targetCards = arCards.filter(c => {
+                return prefix === 'M2-' ? c.id.startsWith('M2-') : c.id.startsWith(prefix);
+            });
+            const total = targetCards.length;
+            if (total === 0) return;
+            const count = targetCards.filter(c => savedData[c.id]).length;
+            
+            // 取得原本名稱 (排除括號進度)
+            const baseName = option.text.split(' [')[0];
+            option.text = `${baseName} [${count}/${total}]`;
+        });
     }
 
     function showPreview(url) {
@@ -770,27 +831,20 @@ const arCards = [
         render();
     }
 
-    function updateProgress(filteredCards) {
-        const total = filteredCards.length;
-        const count = filteredCards.filter(c => savedData[c.id]).length;
-        const percentage = total === 0 ? 0 : Math.round((count / total) * 100);
-        progressText.textContent = `當前篩選進度：${count} / ${total} (${percentage}%)`;
-    }
-
     function showRawData() {
         const dataStr = JSON.stringify(savedData);
-        prompt("這是您的收藏數據代碼，請全選並複製它，然後去其他瀏覽器還原：", dataStr);
+        prompt("這是您的收藏數據，請複製：", dataStr);
     }
 
     function fastImport() {
-        const rawData = prompt("請貼上您備份的數據代碼：");
+        const rawData = prompt("請貼上備份數據：");
         if (rawData) {
             try {
                 savedData = JSON.parse(rawData);
                 localStorage.setItem('myARCollectionImg', rawData);
                 render();
-                alert("還原成功！進度已同步。");
-            } catch(e) { alert("代碼錯誤，請重新複製。"); }
+                alert("還原成功！");
+            } catch(e) { alert("代碼錯誤。"); }
         }
     }
 
