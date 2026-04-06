@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>我的 AR 卡圖鑑 Pro - 繁中官方版</title>
+    <style>
+        :root { --primary-color: #e3350d; --bg-color: #f0f2f5; --card-bg: #ffffff; --text-color: #333; }
+        body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 10px; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding-bottom: 80px; }
+        .header { text-align: center; padding: 15px 0; }
+        h1 { font-size: 20px; margin: 0 0 10px 0; }
+        .sticky-nav { position: sticky; top: 0; z-index: 100; background: var(--bg-color); padding: 5px 0; }
+        .progress-bar-container { background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); text-align: center; }
+        .progress-text { font-size: 16px; font-weight: bold; color: var(--primary-color); margin-bottom: 5px; }
+        .controls { display: flex; flex-direction: column; gap: 8px; margin: 15px 0; }
+        .search-input { padding: 12px; border: 2px solid #ddd; border-radius: 10px; font-size: 16px; outline: none; transition: 0.3s; }
+        .search-input:focus { border-color: var(--primary-color); }
+        .filter-select { padding: 10px; border-radius: 8px; border: 1px solid #ccc; background: white; font-size: 14px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+        .card-item { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer; position: relative; transition: 0.2s; border: 2px solid transparent; }
+        .card-item:active { transform: scale(0.92); }
+        .card-image { width: 100%; aspect-ratio: 3/4; object-fit: contain; background: #eee; display: block; transition: 0.3s; }
+        .card-info { padding: 8px; text-align: center; }
+        .card-id { font-size: 10px; color: #888; display: block; }
+        .card-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+        .card-item.collected .card-image { opacity: 0.35; filter: grayscale(80%); }
+        .card-item.collected { border-color: #28a745; }
+        .check-mark { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 40px; color: #28a745; opacity: 0; transition: 0.2s; pointer-events: none; z-index: 2; text-shadow: 0 0 10px white; }
+        .card-item.collected .check-mark { opacity: 1; }
+        .footer-tools { position: fixed; bottom: 0; left: 0; right: 0; background: white; padding: 10px; display: flex; justify-content: space-around; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 500; }
+        .tool-btn { border: none; background: #f8f9fa; padding: 8px 15px; border-radius: 8px; font-size: 12px; cursor: pointer; color: #555; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .no-results { grid-column: 1/-1; text-align: center; padding: 40px; color: #999; }
+        .back-to-top { position: fixed; bottom: 85px; right: 20px; width: 45px; height: 45px; background: var(--primary-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; z-index: 99; opacity: 0; transition: 0.3s; pointer-events: none; font-size: 20px; }
+        .back-to-top.show { opacity: 1; pointer-events: auto; }
+        #previewModal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; z-index: 2000; justify-content: center; align-items: center; backdrop-filter: blur(8px); }
+        #previewModal img { max-width: 90%; max-height: 80%; border-radius: 15px; box-shadow: 0 0 40px rgba(0,0,0,0.5); transform: scale(0.8); transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+        #previewModal.active img { transform: scale(1); }
+    </style>
+</head>
+<body>
+
+    <div class="header"><h1>✨ 繁中版 AR/CHR 收藏圖鑑</h1></div>
+
+    <div class="sticky-nav">
+        <div class="progress-bar-container"><div id="progressText" class="progress-text">讀取中...</div></div>
+    </div>
+
+    <div class="controls">
+        <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜尋名稱或編號 (如: SV11WF)">
+        <select id="filterSelect" class="filter-select">
+            <option value="all">🌟 全部繁中卡片</option>
+            <option disabled>────── M 系列 (超級進化) ──────</option>
+            <option value="M4">🥷 忍者飛旋 (M4)</option>
+            <option value="M3">🌌 虛無歸零 (M3)</option>
+            <option value="M2a">🧬 超級進化夢想ex (M2a)</option>
+            <option value="M2-">🔥 烈獄狂火X (M2)</option>
+            <option value="M1LF">🔴 超級勇氣 (M1LF)</option>
+            <option value="M1SF">🔵 超級交響樂 (M1SF)</option>
+            <option disabled>────── SV 系列 (朱&紫) ──────</option>
+            <option value="SV11">⚪⚫ 超級電磁砲系列</option>
+            <option value="SV10">🚀 火箭隊的榮耀</option>
+            <option value="SV9">🤝 對戰搭檔系列</option>
+            <option value="SV8">⚡ 樂園滿月/超電突圍</option>
+            <option value="SV2a">🎈 寶可夢 151</option>
+            <option value="s12a">⚔️🛡️ 天地萬物</option>
+        </select>
+    </div>
+
+    <div class="card-grid" id="cardContainer"></div>
+
+    <div id="backToTop" class="back-to-top" onclick="window.scrollTo({top:0, behavior:'smooth'})">🚀</div>
+
+    <div id="previewModal" onclick="closePreview()">
+        <img id="previewImg" src="">
+        <p style="color: white; position: absolute; bottom: 20px;">點擊任意處關閉</p>
+    </div>
+
+    <div class="footer-tools">
+        <button class="tool-btn" onclick="showRawData()"><span>📋</span><span>文字備份</span></button>
+        <button class="tool-btn" onclick="fastImport()"><span>⌨️</span><span>文字還原</span></button>
+        <button class="tool-btn" onclick="window.scrollTo({top:0, behavior:'smooth'})"><span>☝️</span><span>頂端</span></button>
+    </div>
+
+    <script>
+const arCards = [
+       // ==========================================
+            //       2026 最新擴充包：虛無歸零 (M3)            
+            { id: 'M3-081', name: '粉蝶蛹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018384.png' },
+            { id: 'M3-082', name: '木木梟', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018385.png' },
+            { id: 'M3-085', name: '咚咚鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018388.png' },
+            { id: 'M3-086', name: '皮皮', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018389.png' },
+            { id: 'M3-087', name: '妙喵', img: ' https://asia.pokemon-card.com/tw/card-img/tw00018390.png ' },
+            { id: 'M3-088', name: '寶寶暴龍', img: ' https://asia.pokemon-card.com/tw/card-img/tw00018392.png ' },
+            { id: 'M3-089', name: '大朝北鼻', img: ' https://asia.pokemon-card.com/tw/card-img/tw00018391.png ' },
+            { id: 'M3-090', name: '龍王蠍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018393.png' },
+            { id: 'M3-091', name: '雙劍鞘', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018394.png' },
+            { id: 'M3-092', name: '拉達', img: ' https://asia.pokemon-card.com/tw/card-img/tw00018395.png ' },
+            { id: 'M3-AR', name: '冰雪巨龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018387.png' },
+            { id: 'M3-AR', name: '烈箭鷹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00018386.png' },
+// --- 高級擴充包「超級進化夢想ex」 ---
+            { id: 'M2a-194', name: '狩獵鳳蝶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015942.png' },
+            { id: 'M2a-195', name: '毒粉蛾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015943.png' },
+            { id: 'M2a-196', name: '含羞苞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015944.png' },
+            { id: 'M2a-197', name: '<阿響的>熔岩蝸牛', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015945.png' },
+            { id: 'M2a-198', name: '呆火駝', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015946.png' },
+            { id: 'M2a-199', name: '可達鴨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015947.png' },
+            { id: 'M2a-200', name: '雪童子', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015948.png' },
+            { id: 'M2a-201', name: '光電傘蜥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015949.png' },
+            { id: 'M2a-202', name: '夢妖', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015950.png' },
+            { id: 'M2a-203', name: '波克基斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015951.png' },
+            { id: 'M2a-204', name: '赫普的朽木妖', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015952.png' },
+            { id: 'M2a-205', name: '<火箭隊的>謎擬Ｑ', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015953.png' },
+            { id: 'M2a-206', name: '火箭隊的三地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015954.png' },
+            { id: 'M2a-207', name: '恰雷姆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015955.png' },
+            { id: 'M2a-208', name: '<竹蘭的>花岩怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015956.png' },
+            { id: 'M2a-209', name: '伽勒爾 堵攔熊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015957.png' },
+            { id: 'M2a-210', name: 'N的捷克羅姆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015958.png' },
+            { id: 'M2a-211', name: '多龍梅西亞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015959.png' },
+            { id: 'M2a-212', name: '多龍奇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015960.png' },
+            { id: 'M2a-213', name: '旋轉洛托姆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015961.png' },
+// --- 擴充包「超級勇氣」(M1LF) ---
+{ id: 'M1LF-064', name: '妙蛙種子', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014182.png ' },
+{ id: 'M1LF-065', name: '妙蛙草', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014183.png ' },
+{ id: 'M1LF-066', name: '椰蛋樹', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014184.png ' },
+{ id: 'M1LF-067', name: '六尾', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014185.png ' },
+{ id: 'M1LF-068', name: '利歐路', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014186.png ' },
+{ id: 'M1LF-069', name: '瑪夏多', img: ' https://asia.pokemon-card.com/tw/card-img/tw00014187.png ' },
+{ id: 'M1LF-070', name: '鹽石巨靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014188.png' },
+{ id: 'M1LF-071', name: '花岩怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014189.png' },
+{ id: 'M1LF-072', name: '滋汁鼴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014190.png' },
+{ id: 'M1LF-073', name: '大鋼蛇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014191.png' },
+{ id: 'M1LF-074', name: '烈雀', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014192.png' },
+{ id: 'M1LF-075', name: '貓鼬探長', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014193.png' },
+// --- 擴充包「超級交響樂」(M1SF) ---
+{ id: 'M1SF-064', name: '壺壺', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014211.png' },
+{ id: 'M1SF-065', name: '鐵面忍者', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014212.png' },
+{ id: 'M1SF-066', name: '小獅獅', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014213.png' },
+{ id: 'M1SF-067', name: '雪笠怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014214.png' },
+{ id: 'M1SF-068', name: '鋼炮臂蝦', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014215.png' },
+{ id: 'M1SF-069', name: '千面避役', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014216.png' },
+{ id: 'M1SF-070', name: '傘電蜥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014217.png' },
+{ id: 'M1SF-071', name: '胡地', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014218.png' },
+{ id: 'M1SF-072', name: '脫殼忍者', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014219.png' },
+{ id: 'M1SF-073', name: '墓揚犬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014220.png' },
+{ id: 'M1SF-074', name: '信使鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014221.png' },
+{ id: 'M1SF-075', name: '童偶熊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00014222.png' },
+// --- 擴充包「漆黑伏特」(SV11BF)  ---
+{ id: 'SV11BF-087', name: '藤藤蛇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013692.png' },
+{ id: 'SV11BF-088', name: '青藤蛇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013693.png' },
+{ id: 'SV11BF-089', name: '花椰猴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013694.png' },
+{ id: 'SV11BF-090', name: '花椰猿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013695.png' },
+{ id: 'SV11BF-091', name: '百合根娃娃', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013696.png' },
+{ id: 'SV11BF-092', name: '裙兒小姐', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013697.png' },
+{ id: 'SV11BF-093', name: '沙鈴仙人掌', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013698.png' },
+{ id: 'SV11BF-094', name: '蓋蓋蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013699.png' },
+{ id: 'SV11BF-095', name: '哎呀球菇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013700.png' },
+{ id: 'SV11BF-096', name: '敗露球菇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013701.png' },
+{ id: 'SV11BF-097', name: '比克提尼', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013702.png' },
+{ id: 'SV11BF-098', name: '火紅不倒翁', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013703.png' },
+{ id: 'SV11BF-099', name: '達摩狒狒', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013704.png' },
+{ id: 'SV11BF-100', name: '燭光靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013705.png' },
+{ id: 'SV11BF-101', name: '燈火幽靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013706.png' },
+{ id: 'SV11BF-102', name: '水晶燈火靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013707.png' },
+{ id: 'SV11BF-103', name: '燃燒蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013708.png' },
+{ id: 'SV11BF-104', name: '火神蛾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013709.png' },
+{ id: 'SV11BF-105', name: '冷水猴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013710.png' },
+{ id: 'SV11BF-106', name: '冷水猿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013711.png' },
+{ id: 'SV11BF-107', name: '圓蝌蚪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013712.png' },
+{ id: 'SV11BF-108', name: '藍蟾蜍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013713.png' },
+{ id: 'SV11BF-109', name: '蟾蜍王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013714.png' },
+{ id: 'SV11BF-110', name: '原蓋海龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013715.png' },
+{ id: 'SV11BF-111', name: '肋骨海龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013716.png' },
+{ id: 'SV11BF-112', name: '保母曼波', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013717.png' },
+{ id: 'SV11BF-113', name: '噴嚏熊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013718.png' },
+{ id: 'SV11BF-114', name: '凍原熊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013719.png' },
+{ id: 'SV11BF-115', name: '幾何雪花', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013720.png' },
+{ id: 'SV11BF-116', name: '電飛鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013721.png' },
+{ id: 'SV11BF-117', name: '麻麻小魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013722.png' },
+{ id: 'SV11BF-118', name: '麻麻鰻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013723.png' },
+{ id: 'SV11BF-119', name: '麻麻鰻魚王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013724.png' },
+{ id: 'SV11BF-120', name: '雷電雲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013725.png' },
+{ id: 'SV11BF-121', name: '食夢夢', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013726.png' },
+{ id: 'SV11BF-122', name: '夢夢蝕', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013727.png' },
+{ id: 'SV11BF-123', name: '單卵細胞球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013728.png' },
+{ id: 'SV11BF-124', name: '雙卵細胞球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013729.png' },
+{ id: 'SV11BF-125', name: '人造細胞卵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013730.png' },
+{ id: 'SV11BF-126', name: '小灰怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013731.png' },
+{ id: 'SV11BF-127', name: '大宇怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013732.png' },
+{ id: 'SV11BF-128', name: '泥偶小人', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013733.png' },
+{ id: 'SV11BF-129', name: '泥偶巨人', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013734.png' },
+{ id: 'SV11BF-130', name: '螺釘地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013735.png' },
+{ id: 'SV11BF-131', name: '搬運小匠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013736.png' },
+{ id: 'SV11BF-132', name: '鐵骨土人', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013737.png' },
+{ id: 'SV11BF-133', name: '修建老匠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013738.png' },
+{ id: 'SV11BF-134', name: '投摔鬼', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013739.png' },
+{ id: 'SV11BF-135', name: '石居蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013740.png' },
+{ id: 'SV11BF-136', name: '岩殿居蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013741.png' },
+{ id: 'SV11BF-137', name: '土地雲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013742.png' },
+{ id: 'SV11BF-138', name: '百足蜈蚣', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013743.png' },
+{ id: 'SV11BF-139', name: '車輪毬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013744.png' },
+{ id: 'SV11BF-140', name: '蜈蚣王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013745.png' },
+{ id: 'SV11BF-141', name: '黑眼鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013746.png' },
+{ id: 'SV11BF-142', name: '混混鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013747.png' },
+{ id: 'SV11BF-143', name: '流氓鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013748.png' },
+{ id: 'SV11BF-144', name: '禿鷹丫頭', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013749.png' },
+{ id: 'SV11BF-145', name: '禿鷹娜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013750.png' },
+{ id: 'SV11BF-146', name: '騎士蝸牛', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013751.png' },
+{ id: 'SV11BF-147', name: '駒刀小兵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013752.png' },
+{ id: 'SV11BF-148', name: '劈斬司令', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013753.png' },
+{ id: 'SV11BF-149', name: '勾帕路翁', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013754.png' },
+{ id: 'SV11BF-150', name: '牙牙', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013755.png' },
+{ id: 'SV11BF-151', name: '斧牙龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013756.png' },
+{ id: 'SV11BF-152', name: '雙斧戰龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013757.png' },
+{ id: 'SV11BF-153', name: '豆豆鴿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013758.png' },
+{ id: 'SV11BF-154', name: '咕咕鴿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013759.png' },
+{ id: 'SV11BF-155', name: '高傲雉雞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013760.png' },
+{ id: 'SV11BF-156', name: '差不多娃娃', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013761.png' },
+{ id: 'SV11BF-157', name: '泡沫栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013762.png' },
+{ id: 'SV11BF-158', name: '奇諾栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013763.png' },
+// ==========================================
+            //       最新擴充包：純白閃焰 (SV11WF) 
+            // ==========================================
+            { id: 'SV11WF-087', name: '蟲寶包', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013779.png' },
+            { id: 'SV11WF-088', name: '寶包繭', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013780.png' },
+            { id: 'SV11WF-089', name: '保母蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013781.png' },
+            { id: 'SV11WF-090', name: '木棉球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013782.png' },
+            { id: 'SV11WF-091', name: '四季鹿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013783.png' },
+            { id: 'SV11WF-092', name: '萌芽鹿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013784.png' },
+            { id: 'SV11WF-093', name: '小嘴蝸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013785.png' },
+            { id: 'SV11WF-094', name: '敏捷蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013786.png' },
+            { id: 'SV11WF-095', name: '畢力吉翁', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013787.png' },
+            { id: 'SV11WF-096', name: '暖暖豬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013788.png' },
+            { id: 'SV11WF-097', name: '炒炒豬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013789.png' },
+            { id: 'SV11WF-098', name: '炎武王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013790.png' },
+            { id: 'SV11WF-099', name: '爆香猴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013791.png' },
+            { id: 'SV11WF-100', name: '爆香猿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013792.png' },
+            { id: 'SV11WF-101', name: '熔蟻獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013793.png' },
+            { id: 'SV11WF-102', name: '水水獺', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013794.png' },
+            { id: 'SV11WF-103', name: '雙刃丸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013795.png' },
+            { id: 'SV11WF-104', name: '大劍鬼', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013796.png' },
+            { id: 'SV11WF-105', name: '野蠻鱸魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013797.png' },
+            { id: 'SV11WF-106', name: '鴨寶寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013798.png' },
+            { id: 'SV11WF-107', name: '舞天鵝', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013799.png' },
+            { id: 'SV11WF-108', name: '迷你冰', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013800.png' },
+            { id: 'SV11WF-109', name: '多多冰', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013801.png' },
+            { id: 'SV11WF-110', name: '雙倍多多冰', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013802.png' },
+            { id: 'SV11WF-111', name: '斑斑馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013803.png' },
+            { id: 'SV11WF-112', name: '雷電斑馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013804.png' },
+            { id: 'SV11WF-113', name: '電電蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013805.png' },
+            { id: 'SV11WF-114', name: '電蜘蛛', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013806.png' },
+            { id: 'SV11WF-115', name: '泥巴魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013807.png' },
+            { id: 'SV11WF-116', name: '滾滾蝙蝠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013808.png' },
+            { id: 'SV11WF-117', name: '心蝙蝠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013809.png' },
+            { id: 'SV11WF-118', name: '象徵鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013810.png' },
+            { id: 'SV11WF-119', name: '哭哭面具', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013811.png' },
+            { id: 'SV11WF-120', name: '死神棺', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013812.png' },
+            { id: 'SV11WF-121', name: '哥德寶寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013813.png' },
+            { id: 'SV11WF-122', name: '哥德小童', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013814.png' },
+            { id: 'SV11WF-123', name: '哥德小姐', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013815.png' },
+            { id: 'SV11WF-124', name: '輕飄飄', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013816.png' },
+            { id: 'SV11WF-125', name: '石丸子', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013817.png' },
+            { id: 'SV11WF-126', name: '地幔岩', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013818.png' },
+            { id: 'SV11WF-127', name: '龐岩怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013819.png' },
+            { id: 'SV11WF-128', name: '打擊鬼', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013820.png' },
+            { id: 'SV11WF-129', name: '始祖小鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013821.png' },
+            { id: 'SV11WF-130', name: '始祖大鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013822.png' },
+            { id: 'SV11WF-131', name: '功夫鼬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013823.png' },
+            { id: 'SV11WF-132', name: '師父鼬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013824.png' },
+            { id: 'SV11WF-133', name: '代拉基翁', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013825.png' },
+            { id: 'SV11WF-134', name: '扒手貓', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013826.png' },
+            { id: 'SV11WF-135', name: '酷豹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013827.png' },
+            { id: 'SV11WF-136', name: '滑滑小子', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013828.png' },
+            { id: 'SV11WF-137', name: '頭巾混混', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013829.png' },
+            { id: 'SV11WF-138', name: '破破袋', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013830.png' },
+            { id: 'SV11WF-139', name: '灰塵山', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013831.png' },
+            { id: 'SV11WF-140', name: '索羅亞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013832.png' },
+            { id: 'SV11WF-141', name: '索羅亞克', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013833.png' },
+            { id: 'SV11WF-142', name: '單首龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013834.png' },
+            { id: 'SV11WF-143', name: '雙首暴龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013835.png' },
+            { id: 'SV11WF-144', name: '種子鐵球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013836.png' },
+            { id: 'SV11WF-145', name: '堅果啞鈴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013837.png' },
+            { id: 'SV11WF-146', name: '齒輪兒', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013838.png' },
+            { id: 'SV11WF-147', name: '齒輪組', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013839.png' },
+            { id: 'SV11WF-148', name: '齒輪怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013840.png' },
+            { id: 'SV11WF-149', name: '鐵蟻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013841.png' },
+            { id: 'SV11WF-150', name: '赤面龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013842.png' },
+            { id: 'SV11WF-151', name: '探探鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013843.png' },
+            { id: 'SV11WF-152', name: '步哨鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013844.png' },
+            { id: 'SV11WF-153', name: '小約克', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013845.png' },
+            { id: 'SV11WF-154', name: '哈約克', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013846.png' },
+            { id: 'SV11WF-155', name: '長毛狗', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013847.png' },
+            { id: 'SV11WF-156', name: '毛頭小鷹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013848.png' },
+            { id: 'SV11WF-157', name: '勇士雄鷹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013849.png' },
+            { id: 'SV11WF-158', name: '龍捲雲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00013850.png' },       
+// ==========================================
+            //       擴充包：火箭隊的榮耀 (SV10) 
+            // ==========================================
+            { id: 'SV10-099', name: '<火箭隊的>操陷蛛', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012904.png' },
+            { id: 'SV10-100', name: '<火箭隊的>黑魯加', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012905.png' },
+            { id: 'SV10-101', name: '火焰雞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012906.png' },
+            { id: 'SV10-102', name: '珍珠貝', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012907.png' },
+            { id: 'SV10-103', name: '<火箭隊的>果然翁', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012908.png' },
+            { id: 'SV10-104', name: '<火箭隊的>以歐路普', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012909.png' },
+            { id: 'SV10-105', name: '<火箭隊的>雙彈瓦斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012910.png' },
+            { id: 'SV10-106', name: '<火箭隊的>黑暗鴉', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012911.png' },
+            { id: 'SV10-107', name: '藏瑪然特', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012912.png' },
+            { id: 'SV10-108', name: '<火箭隊的>拉達', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012913.png' },
+            { id: 'SV10-109', name: '<火箭隊的>喵喵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012914.png' },
+            { id: 'SV10-110', name: '袋獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012915.png' },
+// ==========================================
+            //       擴充包：熱風競技場 (SV9a) AR
+            // ==========================================
+            { id: 'SV9a-064', name: '蜻蜻蜓', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012722.png' },
+            { id: 'SV9a-065', name: '<竹蘭的>羅絲雷朵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012723.png' },
+            { id: 'SV9a-066', name: '謝米', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012724.png' },
+            { id: 'SV9a-067', name: '岩殿居蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012725.png' },
+            { id: 'SV9a-068', name: '蜜集大蛇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012726.png' },
+            { id: 'SV9a-069', name: '烈焰馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012727.png' },
+            { id: 'SV9a-070', name: '<阿響的>火暴獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012728.png' },
+            { id: 'SV9a-071', name: '<小霞的>可達鴨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012729.png' },
+            { id: 'SV9a-072', name: '<小霞的>拉普拉斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012730.png' },
+            { id: 'SV9a-073', name: '落雷獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012731.png' },
+            { id: 'SV9a-074', name: '洛托姆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012732.png' },
+            { id: 'SV9a-075', name: '<派帕的>藏飽栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012733.png' },
+// ==========================================
+            //       擴充包：對戰搭檔 (SV9) AR 系列
+            // ==========================================
+            { id: 'SV9-101', name: '沙鈴仙人掌', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012627.png' },
+            { id: 'SV9-102', name: '急凍鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012628.png' },
+            { id: 'SV9-103', name: '吼鯨王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012629.png' },
+            { id: 'SV9-104', name: '<奇樹的>大電海燕', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012630.png' },
+            { id: 'SV9-105', name: '<莉莉艾的>蝶結萌虻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012631.png' },
+            { id: 'SV9-106', name: '小山豬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012632.png' },
+            { id: 'SV9-107', name: '鬃岩狼人', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012633.png' },
+            { id: 'SV9-108', name: '<N的>索羅亞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012634.png' },
+            { id: 'SV9-109', name: '<N的>萊希拉姆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012635.png' },
+            { id: 'SV9-110', name: '大尾立', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012636.png' },
+            { id: 'SV9-111', name: '嗡蝠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012637.png' },
+            { id: 'SV9-112', name: '<赫普的>毛辮羊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00012638.png' },
+// ==========================================
+            //       擴充包：超電突圍 (SV8) AR 系列
+            // ==========================================
+            { id: 'SV8-107', name: '彩粉蝶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011460.png' },
+            { id: 'SV8-108', name: '燃燒蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011461.png' },
+            { id: 'SV8-109', name: '蒼炎刃鬼', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011462.png' },
+            { id: 'SV8-110', name: '醜醜魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011463.png' },
+            { id: 'SV8-111', name: '海豹球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011464.png' },
+            { id: 'SV8-112', name: '三合一磁怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011465.png' },
+            { id: 'SV8-113', name: '泥巴魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011466.png' },
+            { id: 'SV8-114', name: '艾姆利多', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011467.png' },
+            { id: 'SV8-115', name: '小小象', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011468.png' },
+            { id: 'SV8-116', name: '阿羅拉三地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011469.png' },
+            { id: 'SV8-117', name: '懶人獺', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011470.png' },
+            { id: 'SV8-118', name: '變隱龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011471.png' },
+// ==========================================
+            //       擴充包：樂園滿月 (SV8a) AR 系列
+            // ==========================================
+            { id: 'SV8a-065', name: '蛋蛋', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011430.png' },
+            { id: 'SV8a-066', name: '燈罩夜菇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011431.png' },
+            { id: 'SV8a-067', name: '飄浮泡泡 (太陽的樣子)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011432.png' },
+            { id: 'SV8a-068', name: '磨牙彩皮魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011433.png' },
+            { id: 'SV8a-069', name: '浩大鯨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011434.png' },
+            { id: 'SV8a-070', name: '拉帝歐斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011435.png' },
+            { id: 'SV8a-071', name: '超音波幼蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011436.png' },
+            { id: 'SV8a-072', name: '拳拳蛸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011437.png' },
+            { id: 'SV8a-073', name: '盔甲鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011438.png' },
+            { id: 'SV8a-074', name: '蘋裹龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011439.png' },
+            { id: 'SV8a-075', name: '豐蜜龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011440.png' },
+            { id: 'SV8a-076', name: '勇士雄鷹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011441.png' },
+// ==========================================
+            //       擴充包：星晶奇跡 (SV7) AR 系列
+            // ==========================================
+            { id: 'SV7-103', name: '安瓢蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010998.png' },
+            { id: 'SV7-104', name: '觸手百合', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010999.png' },
+            { id: 'SV7-105', name: '爆焰龜獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011000.png' },
+            { id: 'SV7-106', name: '騰蹴小將', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011001.png' },
+            { id: 'SV7-107', name: '好勝毛蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011002.png' },
+            { id: 'SV7-108', name: '電電蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011003.png' },
+            { id: 'SV7-109', name: '捷拉奧拉', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011004.png' },
+            { id: 'SV7-110', name: '小仙奶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011005.png' },
+            { id: 'SV7-111', name: '瑪沙那', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011006.png' },
+            { id: 'SV7-112', name: '溶食獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011007.png' },
+            { id: 'SV7-113', name: '鋁鋼橋龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011008.png' },
+            { id: 'SV7-114', name: '貓頭夜鷹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00011009.png' },
+// ==========================================
+            //       擴充包：黑夜漫遊者 (SV6a) AR 系列
+            // ==========================================
+            { id: 'SV6a-065', name: '卡璞・哞哞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010866.png' },
+            { id: 'SV6a-066', name: '黑魯加', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010867.png' },
+            { id: 'SV6a-067', name: '墨海馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010868.png' },
+            { id: 'SV6a-068', name: '夜巡靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010869.png' },
+            { id: 'SV6a-069', name: '彷徨夜靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010870.png' },
+            { id: 'SV6a-070', name: '黑夜魔靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010871.png' },
+            { id: 'SV6a-071', name: '克雷色利亞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010872.png' },
+            { id: 'SV6a-072', name: '索羅亞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010873.png' },
+            { id: 'SV6a-073', name: '銅象', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010874.png' },
+            { id: 'SV6a-074', name: '斧牙龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010875.png' },
+            { id: 'SV6a-075', name: '貓老大', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010876.png' },
+            { id: 'SV6a-076', name: '穿著熊', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010877.png' },
+// ==========================================
+            //       擴充包：變幻假面 (SV6) AR 系列
+            // ==========================================
+            { id: 'SV6-102', name: '向日花怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010554.png' },
+            { id: 'SV6-103', name: '裹蜜蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010555.png' },
+            { id: 'SV6-104', name: '雪妖女', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010556.png' },
+            { id: 'SV6-105', name: '電海燕', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010557.png' },
+            { id: 'SV6-106', name: '風鈴鈴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010558.png' },
+            { id: 'SV6-107', name: '願增猿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010559.png' },
+            { id: 'SV6-108', name: '吉雉雞', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010560.png' },
+            { id: 'SV6-109', name: '搬運小匠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010561.png' },
+            { id: 'SV6-110', name: '夠讚狗', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010562.png' },
+            { id: 'SV6-111', name: '可多拉', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010563.png' },
+            { id: 'SV6-112', name: '米立龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010564.png' },
+            { id: 'SV6-113', name: '吉利蛋', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010565.png' },
+// ==========================================
+            //       擴充包：變幻假面 (SV6) AR 系列 (續)
+            // ==========================================
+            { id: 'SV6-067', name: '凱羅斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010700.png' },
+            { id: 'SV6-068', name: '斯魔茶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010701.png' },
+            { id: 'SV6-069', name: '煤炭龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010702.png' },
+            { id: 'SV6-070', name: '烈焰猴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010703.png' },
+            { id: 'SV6-071', name: '霏歐納', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010704.png' },
+            { id: 'SV6-072', name: '古月鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010705.png' },
+            { id: 'SV6-073', name: '光電傘蜥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010706.png' },
+            { id: 'SV6-074', name: '眷戀雲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010707.png' },
+            { id: 'SV6-075', name: '洗翠卡蒂狗', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010708.png' },
+            { id: 'SV6-076', name: '大朝北鼻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010709.png' },
+            { id: 'SV6-077', name: '啃果蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010710.png' },
+            { id: 'SV6-078', name: '伊布', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010711.png' },
+// ==========================================
+            //       擴充包：狂野之力 (SV5K) AR 系列
+            // ==========================================
+            { id: 'SV5K-072', name: '樹林龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010195.png' },
+            { id: 'SV5K-073', name: '雪吞蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010196.png' },
+            { id: 'SV5K-074', name: '銅鏡怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010197.png' },
+            { id: 'SV5K-075', name: '人造細胞卵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010198.png' },
+            { id: 'SV5K-076', name: '振翼髮', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010199.png' },
+            { id: 'SV5K-077', name: '古空棘魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010200.png' },
+            { id: 'SV5K-078', name: '重泥挽馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010201.png' },
+            { id: 'SV5K-079', name: '阿柏怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010202.png' },
+            { id: 'SV5K-080', name: '鬼斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010203.png' },
+            { id: 'SV5K-081', name: '聒噪鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010204.png' },
+            { id: 'SV5K-082', name: '泡沫栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010205.png' },
+            { id: 'SV5K-083', name: '奇諾栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010206.png' },
+// ==========================================
+            //       擴充包：異度審判 (SV5M) AR 系列
+            // ==========================================
+            { id: 'SV5M-072', name: '狡猾天狗', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010221.png' },
+            { id: 'SV5M-073', name: '四季鹿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010222.png' },
+            { id: 'SV5M-074', name: '萌芽鹿', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010223.png' },
+            { id: 'SV5M-075', name: '火斑喵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010224.png' },
+            { id: 'SV5M-076', name: '蟲電寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010225.png' },
+            { id: 'SV5M-077', name: '鐵荊棘', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010226.png' },
+            { id: 'SV5M-078', name: '萌虻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010227.png' },
+            { id: 'SV5M-079', name: '龍頭地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010228.png' },
+            { id: 'SV5M-080', name: '巨金怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010229.png' },
+            { id: 'SV5M-081', name: '美錄坦', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010230.png' },
+            { id: 'SV5M-082', name: '大舌頭', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010231.png' },
+            { id: 'SV5M-083', name: '老翁龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010232.png' },
+// ==========================================
+            //       高級擴充包：閃色寶藏 ex (SV4a) AR
+            // ==========================================
+            { id: 'SV4a-338', name: '三海地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00009367.png' },
+            { id: 'SV4a-339', name: '海豚俠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00009368.png' },
+            { id: 'SV4a-340', name: '布撥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00009369.png' },
+            { id: 'SV4a-341', name: '謎擬Ｑ', img: 'https://asia.pokemon-card.com/tw/card-img/tw00009370.png' },
+// ==========================================
+            //       擴充包：未來閃光 (SV4M) AR 系列
+            // ==========================================
+            { id: 'SV4M-067', name: '天罩蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010674.png' },
+            { id: 'SV4M-068', name: '陸地水母', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010675.png' },
+            { id: 'SV4M-069', name: '鐵毒蛾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010676.png' },
+            { id: 'SV4M-070', name: '多多冰', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010677.png' },
+            { id: 'SV4M-071', name: '鐵包袱', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010678.png' },
+            { id: 'SV4M-072', name: '斑斑馬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010679.png' },
+            { id: 'SV4M-073', name: '超能艷鴕', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010680.png' },
+            { id: 'SV4M-074', name: '大鋼蛇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010681.png' },
+            { id: 'SV4M-075', name: '長尾怪手', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010682.png' },
+            { id: 'SV4M-076', name: '青綿鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010683.png' },
+            { id: 'SV4M-077', name: '多邊獸Ｚ', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010684.png' },
+            { id: 'SV4M-078', name: '鐵脖頸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010685.png' },
+// ==========================================
+            //       擴充包：古代咆哮 (SV4Kb) AR 系列
+            // ==========================================
+            { id: 'SV4Kb-067', name: '岩殿居蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010648.png' },
+            { id: 'SV4Kb-068', name: '鴨嘴寶寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010649.png' },
+            { id: 'SV4Kb-069', name: '膽小蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010650.png' },
+            { id: 'SV4Kb-070', name: '輕身鱈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010651.png' },
+            { id: 'SV4Kb-071', name: '吼叫尾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010652.png' },
+            { id: 'SV4Kb-072', name: '師父鼬', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010653.png' },
+            { id: 'SV4Kb-073', name: '鹽石巨靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010654.png' },
+            { id: 'SV4Kb-074', name: '爬地翅', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010655.png' },
+            { id: 'SV4Kb-075', name: '灰塵山', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010656.png' },
+            { id: 'SV4Kb-076', name: '莫魯貝可', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010657.png' },
+            { id: 'SV4Kb-077', name: '猛惡菇', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010658.png' },
+            { id: 'SV4Kb-078', name: '吼爆彈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00010659.png' },
+// ==========================================
+            //       擴充包：激狂浪潮 (SV4Ka) AR 系列
+            // ==========================================
+            { id: 'SV4Ka-063', name: '雪童子', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008858.png' },
+            { id: 'SV4Ka-064', name: '小球飛魚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008859.png' },
+            { id: 'SV4Ka-065', name: '正電拍拍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008860.png' },
+            { id: 'SV4Ka-066', name: '負電拍拍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008861.png' },
+            { id: 'SV4Ka-067', name: '電電蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008862.png' },
+            { id: 'SV4Ka-068', name: '索財靈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008863.png' },
+            { id: 'SV4Ka-069', name: '固拉多', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008864.png' },
+            { id: 'SV4Ka-070', name: '小隕星', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008865.png' },
+            { id: 'SV4Ka-071', name: '伊裴爾塔爾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008866.png' },
+            { id: 'SV4Ka-072', name: '堅果啞鈴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008867.png' },
+            { id: 'SV4Ka-073', name: '堅盾劍怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008868.png' },
+            { id: 'SV4Ka-074', name: '摩托蜥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008869.png' },
+// ==========================================
+            //       擴充包：黑炎的支配者 (SV3) AR 系列
+            // ==========================================
+            { id: 'SV3-109', name: '臭臭花', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008705.png' },
+            { id: 'SV3-110', name: '九尾', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008706.png' },
+            { id: 'SV3-111', name: '海豚俠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008707.png' },
+            { id: 'SV3-112', name: '電肚蛙', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008708.png' },
+            { id: 'SV3-113', name: '皮寶寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008709.png' },
+            { id: 'SV3-114', name: '幼基拉斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008710.png' },
+            { id: 'SV3-115', name: '戴魯比', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008711.png' },
+            { id: 'SV3-116', name: '巨鉗螳螂', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008712.png' },
+            { id: 'SV3-117', name: '噗隆隆', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008713.png' },
+            { id: 'SV3-118', name: '波波', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008714.png' },
+            { id: 'SV3-119', name: '比比鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008715.png' },
+            { id: 'SV3-120', name: '愛吃豚', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008716.png' },
+// ==========================================
+            //       強化擴充包：寶可夢 151 (SV2a) AR
+            // ==========================================
+            { id: 'SV2a-166', name: '妙蛙種子', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008289.png' },
+            { id: 'SV2a-167', name: '妙蛙草', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008290.png' },
+            { id: 'SV2a-168', name: '小火龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008291.png' },
+            { id: 'SV2a-169', name: '火恐龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008292.png' },
+            { id: 'SV2a-170', name: '傑尼龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008293.png' },
+            { id: 'SV2a-171', name: '卡咪龜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008294.png' },
+            { id: 'SV2a-172', name: '綠毛蟲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008295.png' },
+            { id: 'SV2a-173', name: '皮卡丘', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008296.png' },
+            { id: 'SV2a-174', name: '尼多王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008297.png' },
+            { id: 'SV2a-175', name: '可達鴨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008298.png' },
+            { id: 'SV2a-176', name: '蚊香君', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008299.png' },
+            { id: 'SV2a-177', name: '豪力', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008300.png' },
+            { id: 'SV2a-178', name: '蔓藤怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008301.png' },
+            { id: 'SV2a-179', name: '魔牆人偶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008302.png' },
+            { id: 'SV2a-180', name: '菊石獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008303.png' },
+            { id: 'SV2a-181', name: '卡比獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008304.png' },
+            { id: 'SV2a-182', name: '哈克龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008305.png' },
+            { id: 'SV2a-183', name: '超夢', img: 'https://asia.pokemon-card.com/tw/card-img/tw00008306.png' },
+// ==========================================
+            //       擴充包：雪崩攀登 (SV2Pa) AR 系列
+            // ==========================================
+            { id: 'SV2Pa-072', name: '納噬草', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015759.png' },
+            { id: 'SV2Pa-073', name: '瑪力露', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015760.png' },
+            { id: 'SV2Pa-074', name: '冰砌鵝', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015761.png' },
+            { id: 'SV2Pa-075', name: '涼脊龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015762.png' },
+            { id: 'SV2Pa-076', name: '凍脊龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015763.png' },
+            { id: 'SV2Pa-077', name: '戟脊龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015764.png' },
+            { id: 'SV2Pa-078', name: '哥德小童', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015765.png' },
+            { id: 'SV2Pa-079', name: '蟲甲聖', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015766.png' },
+            { id: 'SV2Pa-080', name: '樹才怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015767.png' },
+            { id: 'SV2Pa-081', name: '拖拖蚓', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015768.png' },
+            { id: 'SV2Pa-082', name: '稚山雀', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015769.png' },
+            { id: 'SV2Pa-083', name: '土龍節節', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015770.png' },
+// ==========================================
+            //       擴充包：三重效應 (SV2Da) AR 系列
+            // ==========================================
+            { id: 'SV2Da-072', name: '赫拉克羅斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015787.png' },
+            { id: 'SV2Da-073', name: '火箭雀', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015788.png' },
+            { id: 'SV2Da-074', name: '雷丘', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015789.png' },
+            { id: 'SV2Da-075', name: '沙丘娃', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015790.png' },
+            { id: 'SV2Da-076', name: '小鍛匠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015791.png' },
+            { id: 'SV2Da-077', name: '巧鍛匠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015792.png' },
+            { id: 'SV2Da-078', name: '鹽石寶', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015793.png' },
+            { id: 'SV2Da-079', name: '班基拉斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015794.png' },
+            { id: 'SV2Da-080', name: '塗標客', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015795.png' },
+            { id: 'SV2Da-081', name: '一家鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015796.png' },
+            { id: 'SV2Da-082', name: '纏紅鶴', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015797.png' },
+            { id: 'SV2Da-083', name: '奇麒麟', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015798.png' },
+// ==========================================
+            //       朱/紫起始擴充包 (SV1a) AR 系列
+            // ==========================================
+            { id: 'SV1a-074', name: '熱帶龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015729.png' },
+            { id: 'SV1a-075', name: '新葉喵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015730.png' },
+            { id: 'SV1a-076', name: '蒂蕾喵', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015731.png' },
+            { id: 'SV1a-077', name: '火炎獅', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015732.png' },
+            { id: 'SV1a-078', name: '呆火鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015733.png' },
+            { id: 'SV1a-079', name: '炙燙鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015734.png' },
+            { id: 'SV1a-080', name: '鯉魚王', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015735.png' },
+            { id: 'SV1a-081', name: '潤水鴨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015736.png' },
+            { id: 'SV1a-082', name: '湧躍鴨', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015737.png' },
+            { id: 'SV1a-083', name: '夢妖魔', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015738.png' },
+            { id: 'SV1a-084', name: '帕底亞 肯泰羅', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015739.png' },
+            { id: 'SV1a-085', name: '帕底亞 烏波', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015740.png' },
+// ==========================================
+            //       擴充包：朱 ex (SV1Sa) AR 系列
+            // ==========================================
+            { id: 'SV1Sa-079', name: '奧利紐', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015830.png' },
+            { id: 'SV1Sa-080', name: '紅蓮鎧騎', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015831.png' },
+            { id: 'SV1Sa-081', name: '海地鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015832.png' },
+            { id: 'SV1Sa-082', name: '吃吼霸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015833.png' },
+            { id: 'SV1Sa-083', name: '拉魯拉絲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015834.png' },
+            { id: 'SV1Sa-084', name: '奇魯莉安', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015835.png' },
+            { id: 'SV1Sa-085', name: '狗仔包', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015836.png' },
+            { id: 'SV1Sa-086', name: '利歐路', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015837.png' },
+            { id: 'SV1Sa-087', name: '黑眼鱷', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015838.png' },
+            { id: 'SV1Sa-088', name: '毛崖蟹', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015839.png' },
+            { id: 'SV1Sa-089', name: '仆刀將軍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015840.png' },
+            { id: 'SV1Sa-090', name: '姆克兒', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015841.png' },
+// ==========================================
+            //       擴充包：紫 ex (SV1Va) AR 系列
+            // ==========================================
+            { id: 'SV1Va-079', name: '團珠蛛', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015860.png' },
+            { id: 'SV1Va-080', name: '原野水母', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015861.png' },
+            { id: 'SV1Va-081', name: '狠辣椒', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015862.png' },
+            { id: 'SV1Va-082', name: '呆呆獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015863.png' },
+            { id: 'SV1Va-083', name: '鐵臂槍蝦', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015864.png' },
+            { id: 'SV1Va-084', name: '帕奇利茲', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015865.png' },
+            { id: 'SV1Va-085', name: '巴布土撥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015866.png' },
+            { id: 'SV1Va-086', name: '催眠貘', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015867.png' },
+            { id: 'SV1Va-087', name: '墓仔狗', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015868.png' },
+            { id: 'SV1Va-088', name: '獒教父', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015869.png' },
+            { id: 'SV1Va-089', name: '下石鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015870.png' },
+            { id: 'SV1Va-090', name: '貪心栗鼠', img: 'https://asia.pokemon-card.com/tw/card-img/tw00015871.png' },
+// ==========================================
+            //       劍/盾高級擴充包：天地萬物 (s12a) AR
+            // ==========================================
+            { id: 's12a-173', name: '洗翠 霹靂電球', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007493.png' },
+            { id: 's12a-174', name: '音箱蟀', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007494.png' },
+            { id: 's12a-175', name: '鴨嘴炎獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007495.png' },
+            { id: 's12a-176', name: '花舞鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007496.png' },
+            { id: 's12a-177', name: '拉普拉斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007497.png' },
+            { id: 's12a-178', name: '瑪納霏', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007498.png' },
+            { id: 's12a-179', name: '凱路迪歐', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007499.png' },
+            { id: 's12a-180', name: '電擊魔獸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007500.png' },
+            { id: 's12a-181', name: '顫弦蠑螈', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007501.png' },
+            { id: 's12a-182', name: '伽勒爾 急凍鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007502.png' },
+            { id: 's12a-183', name: '夢幻', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007503.png' },
+            { id: 's12a-184', name: '月石', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007504.png' },
+            { id: 's12a-185', name: '代歐奇希斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007505.png' },
+            { id: 's12a-186', name: '蒂安希', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007506.png' },
+            { id: 's12a-187', name: '花療環環', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007507.png' },
+            { id: 's12a-188', name: '伽勒爾 閃電鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007508.png' },
+            { id: 's12a-189', name: '太陽岩', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007509.png' },
+            { id: 's12a-190', name: '伽勒爾 火焰鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007510.png' },
+            { id: 's12a-191', name: '阿勃梭魯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007511.png' },
+            { id: 's12a-192', name: '狐大盜', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007512.png' },
+            { id: 's12a-193', name: '自爆磁怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007513.png' },
+            { id: 's12a-194', name: '七夕青鳥', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007514.png' },
+            { id: 's12a-195', name: '拉帝亞斯', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007515.png' },
+            { id: 's12a-196', name: '洗翠 黏美龍', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007516.png' },
+            { id: 's12a-197', name: '百變怪', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007517.png' },
+            { id: 's12a-198', name: '土龍弟弟', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007518.png' },
+            { id: 's12a-199', name: '大奶罐', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007519.png' },
+            { id: 's12a-200', name: '大尾狸', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007520.png' },
+            { id: 's12a-201', name: '利歐路 (連畫01)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007521.png' },
+            { id: 's12a-202', name: '青綿鳥 (連畫02)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007522.png' },
+            { id: 's12a-203', name: '夜巡靈 (連畫03)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007523.png' },
+            { id: 's12a-204', name: '大牙狸 (連畫04)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007524.png' },
+            { id: 's12a-205', name: '皮卡丘 (連畫05)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007525.png' },
+            { id: 's12a-206', name: '草苗龜 (連畫06)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007526.png' },
+            { id: 's12a-207', name: '派拉斯 (連畫07)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007527.png' },
+            { id: 's12a-208', name: '土狼犬 (連畫08)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007528.png' },
+            { id: 's12a-209', name: '咩利羊 (連畫09)', img: 'https://asia.pokemon-card.com/tw/card-img/tw00007529.png' },
+// ==========================================
+        //   🥷 擴充包：忍者飛旋 (M4) AR 系列
+        // ==========================================
+        { id: 'M4-084', name: '哈力栗', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63667971a24000107f82f/800x.webp' },
+        { id: 'M4-085', name: '火狐狸', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636675eb81d0001359780/800x.webp' },
+        { id: 'M4-086', name: '呱呱泡蛙', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63667971a24000107f82c/800x.webp' },
+        { id: 'M4-087', name: '呱頭蛙', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63666971a24000107f82a/800x.webp' },
+        { id: 'M4-088', name: '電龍', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636665eb81d000135977a/800x.webp' },
+        { id: 'M4-089', name: '哲爾尼亞斯', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63665971a24000107f7ea/800x.webp' },
+        { id: 'M4-090', name: '念力土偶', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636655eb81d0001359743/800x.webp' },
+        { id: 'M4-091', name: '叉字蝠', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63664971a24000107f7e2/800x.webp' },
+        { id: 'M4-092', name: '金屬怪', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63664971a24000107f7e3/800x.webp' },
+        { id: 'M4-093', name: '黏美兒', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636645eb81d0001359741/800x.webp' },
+        { id: 'M4-094', name: '肯泰羅', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c63663971a24000107f7dc/800x.webp' },
+        { id: 'M4-095', name: '步哨鼠', img: 'https://shoplineimg.com/5fe008b815c89500281a791c/69c636645eb81d000135973f/800x.webp' },
+// ==========================================
+        //   🔥 擴充包：烈獄狂火 (M2) AR 系列
+        // ==========================================
+        { id: 'M2-081', name: '樂天河童', img: 'https://s1.52poke.com/wiki/thumb/2/22/M2-081.jpg/429px-M2-081.jpg' },
+        { id: 'M2-082', name: '豆蟋蟀', img: 'https://s1.52poke.com/wiki/thumb/2/26/M2-082.jpg/429px-M2-082.jpg' },
+        { id: 'M2-083', name: '炭小侍', img: 'https://s1.52poke.com/wiki/thumb/7/7e/M2-083.jpg/429px-M2-083.jpg' },
+        { id: 'M2-084', name: '白海獅', img: 'https://s1.52poke.com/wiki/thumb/9/98/M2-084.jpg/429px-M2-084.jpg' },
+        { id: 'M2-085', name: '波加曼', img: 'https://s1.52poke.com/wiki/thumb/b/bc/M2-085.jpg/429px-M2-085.jpg' },
+        { id: 'M2-086', name: '來電汪', img: 'https://s1.52poke.com/wiki/thumb/7/7e/M2-086.jpg/429px-M2-086.jpg' },
+        { id: 'M2-087', name: '蒼響', img: 'https://s1.52poke.com/wiki/thumb/6/62/M2-087.jpg/429px-M2-087.jpg' },
+        { id: 'M2-088', name: '沙漠蜻蜓', img: 'https://s1.52poke.com/wiki/thumb/f/fb/M2-088.jpg/429px-M2-088.jpg' },
+        { id: 'M2-089', name: '顫弦蠑螈', img: 'https://s1.52poke.com/wiki/thumb/b/b1/M2-089.jpg/429px-M2-089.jpg' },
+        { id: 'M2-090', name: '托戈德瑪爾', img: 'https://s1.52poke.com/wiki/thumb/5/5b/M2-090.jpg/429px-M2-090.jpg' },
+        { id: 'M2-091', name: '胖可丁', img: 'https://s1.52poke.com/wiki/thumb/0/0c/M2-091.jpg/429px-M2-091.jpg' },
+        { id: 'M2-092', name: '雙尾怪手', img: 'https://s1.52poke.com/wiki/thumb/9/94/M2-092.jpg/429px-M2-092.jpg' },
+    ];
+
+
+    const container = document.getElementById('cardContainer');
+    const progressText = document.getElementById('progressText');
+    const searchInput = document.getElementById('searchInput');
+    const filterSelect = document.getElementById('filterSelect');
+
+    let savedData = JSON.parse(localStorage.getItem('myARCollectionImg')) || {};
+    let currentSearch = '';
+    let currentFilter = 'all';
+
+    window.onscroll = function() {
+        const btn = document.getElementById('backToTop');
+        if (document.body.scrollTop > 300 || document.documentElement.scrollTop > 300) {
+            btn.classList.add('show');
+        } else {
+            btn.classList.remove('show');
+        }
+    };
+
+    function render() {
+        container.innerHTML = '';
+        const filtered = arCards.filter(card => {
+            const matchSearch = card.name.toLowerCase().includes(currentSearch) || card.id.toLowerCase().includes(currentSearch);
+            let matchFilter = true;
+            if (currentFilter !== 'all') {
+                // 特殊邏輯：M2- 必須精確匹配 M2- 開頭，排除 M2a
+                if (currentFilter === 'M2-') {
+                    matchFilter = card.id.startsWith('M2-');
+                } else {
+                    matchFilter = card.id.startsWith(currentFilter);
+                }
+            }
+            return matchSearch && matchFilter;
+        });
+
+        if (filtered.length === 0) {
+            container.innerHTML = '<div class="no-results">找不到符合條件的卡片 🔍</div>';
+        } else {
+            filtered.forEach(card => {
+                const isCollected = savedData[card.id];
+                const div = document.createElement('div');
+                div.className = `card-item ${isCollected ? 'collected' : ''}`;
+                div.onclick = () => toggleCard(card.id);
+                div.oncontextmenu = (e) => { e.preventDefault(); showPreview(card.img); };
+                div.innerHTML = `
+                    <img src="${card.img}" class="card-image" loading="lazy">
+                    <div class="check-mark">✔️</div>
+                    <div class="card-info">
+                        <span class="card-id">${card.id}</span>
+                        <span class="card-name">${card.name}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        updateProgress(filtered);
+    }
+
+    function showPreview(url) {
+        const modal = document.getElementById('previewModal');
+        const img = document.getElementById('previewImg');
+        img.src = url;
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('active'), 10);
+    }
+
+    function closePreview() {
+        const modal = document.getElementById('previewModal');
+        modal.classList.remove('active');
+        setTimeout(() => modal.style.display = 'none', 300);
+    }
+
+    function toggleCard(id) {
+        savedData[id] = !savedData[id];
+        localStorage.setItem('myARCollectionImg', JSON.stringify(savedData));
+        render();
+    }
+
+    function updateProgress(filteredCards) {
+        const total = filteredCards.length;
+        const count = filteredCards.filter(c => savedData[c.id]).length;
+        const percentage = total === 0 ? 0 : Math.round((count / total) * 100);
+        progressText.textContent = `當前篩選進度：${count} / ${total} (${percentage}%)`;
+    }
+
+    function showRawData() {
+        const dataStr = JSON.stringify(savedData);
+        prompt("這是您的收藏數據代碼，請全選並複製它，然後去其他瀏覽器還原：", dataStr);
+    }
+
+    function fastImport() {
+        const rawData = prompt("請貼上您備份的數據代碼：");
+        if (rawData) {
+            try {
+                savedData = JSON.parse(rawData);
+                localStorage.setItem('myARCollectionImg', rawData);
+                render();
+                alert("還原成功！進度已同步。");
+            } catch(e) { alert("代碼錯誤，請重新複製。"); }
+        }
+    }
+
+    function init() {
+        searchInput.addEventListener('input', e => { currentSearch = e.target.value.toLowerCase(); render(); });
+        filterSelect.addEventListener('change', e => { currentFilter = e.target.value; render(); });
+        render();
+    }
+
+    init();
+    </script>
+</body>
+</html>
